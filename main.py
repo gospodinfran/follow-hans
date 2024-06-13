@@ -5,15 +5,32 @@ import time
 
 def main():
     user = initialization()
-    print(user)
+    update_blitz_rating(user.username)
 
 
 class User:
-    def __init__(self, username, time_elapsed, is_online, last_blitz_rating) -> None:
+    def __init__(self, player_id, id, url, username, followers, country, last_online, joined, status, is_streamer, verified, streaming_platforms, time_elapsed, is_online, last_blitz_rating, avatar=None, location=None, league=None, name=None, title=None, twitch_url=None):
+        self.avatar = avatar
+        self.player_id = player_id
+        self.id = id
+        self.url = url
+        self.name = name
         self.username = username
+        self.followers = followers
+        self.country = country
+        self.location = location
+        self.last_online = last_online
+        self.joined = joined
+        self.status = status
+        self.is_streamer = is_streamer
+        self.verified = verified
+        self.league = league
+        self.streaming_platforms = streaming_platforms
         self.time_elapsed = time_elapsed
         self.is_online = is_online
         self.last_blitz_rating = last_blitz_rating
+        self.title = title
+        self.twitch_url = twitch_url
         print('initialized user class instance')
 
     def __str__(self) -> str:
@@ -35,21 +52,22 @@ def initialization():
         "Which user to follow: ").strip().lower()
 
     user_object = fetch_local_user_stats(chesscom_username)
-    if user_object is not None:
-        username, time_elapsed, is_online, last_blitz_rating = user_object
-
-        return User(username, time_elapsed,
-                    is_online, last_blitz_rating)
-
-    else:
+    if user_object is None:
         print('user not in local db')
         user_object = fetch_server_user_stats(chesscom_username)
 
+        user_object['id'] = user_object['@id']
+        user_object.pop('@id')
+
         user_object['time_elapsed'] = 0
         user_object['is_online'] = False
-        user_object['last_blitz_rating'] = 3000
+        user_object['last_blitz_rating'] = None
 
         update_stats(chesscom_username, user_object)
+
+    update_blitz_rating(chesscom_username)
+
+    return User(**user_object)
 
 
 def fetch_local_user_stats(username):
@@ -59,13 +77,9 @@ def fetch_local_user_stats(username):
         if username in loaded_data['usernames']:
             print('chesscom username in local database')
 
-            user_data = loaded_data['usernames']
+            user_data = loaded_data['usernames'][username]
 
-            time_elapsed = user_data['time_elapsed']
-            is_online = user_data['is_online']
-            last_blitz_rating = user_data['last_blitz_rating']
-
-            return username, time_elapsed, is_online, last_blitz_rating
+            return user_data
         else:
             print('chesscom username not in local database')
 
@@ -94,11 +108,23 @@ def update_stats(username, user_object):
 
 
 def check_if_online(username):
+    # endpoint does not seem to work any more
     try:
         pass
     except:
         print('could not fetch is_online information')
-    pass
+
+
+def update_blitz_rating(username):
+    stats_url = f'https://api.chess.com/pub/player/{username}/stats'
+    res = requests.get(stats_url, headers=headers)
+    response = res.json()
+    blitz_rating = response['chess_blitz']['last']['rating']
+
+    user_obj = fetch_local_user_stats(username)
+    user_obj['last_blitz_rating'] = blitz_rating
+
+    update_stats(username, user_obj)
 
 
 def main_loop():
