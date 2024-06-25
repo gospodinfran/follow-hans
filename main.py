@@ -1,11 +1,14 @@
 import json
 import requests
 import time
+from bs4 import BeautifulSoup as bs
 
 
 def main():
     user = initialization()
     update_blitz_rating(user.username)
+
+    check_online_status(user.username)
 
 
 class User:
@@ -65,7 +68,7 @@ def initialization():
 
         update_stats(chesscom_username, user_object)
 
-    update_blitz_rating(chesscom_username)
+    update_blitz_rating(chesscom_username, user_object)
 
     return User(**user_object)
 
@@ -75,7 +78,6 @@ def fetch_local_user_stats(username):
     with open("db.json", "r") as infile:
         loaded_data = json.load(infile)
         if username in loaded_data['usernames']:
-            print('chesscom username in local database')
 
             user_data = loaded_data['usernames'][username]
 
@@ -115,16 +117,38 @@ def check_if_online(username):
         print('could not fetch is_online information')
 
 
-def update_blitz_rating(username):
+def update_blitz_rating(username, user_object=None):
     stats_url = f'https://api.chess.com/pub/player/{username}/stats'
     res = requests.get(stats_url, headers=headers)
     response = res.json()
     blitz_rating = response['chess_blitz']['last']['rating']
 
-    user_obj = fetch_local_user_stats(username)
+    user_obj = user_object if user_object else fetch_local_user_stats(username)
     user_obj['last_blitz_rating'] = blitz_rating
 
     update_stats(username, user_obj)
+
+
+def track_if_in_game():
+    pass
+
+
+def check_online_status(username):
+    res = requests.get(
+        f'https://www.chess.com/member/{username}', headers=headers)
+
+    if res.status_code == 200:
+        soup = bs(res.content, 'html.parser')
+        results = soup.find(id='view-profile')
+        print(results.prettify())
+
+        status_text = results.find(
+            'div', string='profile-card-info-item-value')
+
+        if status_text:
+            print(status_text.text)
+    else:
+        print('failed to reach chesscom')
 
 
 def main_loop():
